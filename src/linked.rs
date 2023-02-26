@@ -109,56 +109,130 @@ impl<T> List<T> {
             unsafe { (*self.tail).ele.as_ref() }
         }
     }
-    pub fn remove(&mut self, index: u64) {
-        assert!(index<=self.size&&index>0);
-        
-    }
-    pub fn insert(&mut self, index: u64,ele:T) {
-        assert!(index<=self.size+1&&index>0);
-        if index==1{
-            self.push_front(ele);
-        }else if index==self.size{
-            self.push_back(ele);
-        }else{
-            let mut obs=1;
-            let mut pos;
-            if index>self.size/2{
-                pos=self.tail;
-                while (self.size-obs)!=index {
-                    pos=unsafe{(*pos).prev};
-                    obs+=1;
+    pub fn remove(&mut self, index: u64) -> Option<T> {
+        if index > self.size || index == 0 {
+            None
+        } else {
+            if index == 1 {
+                self.drop_first()
+            } else if index == self.size {
+                self.drop_last()
+            } else {
+                let mut obs = 0;
+                let mut pos;
+                if index > self.size / 2 {
+                    pos = self.tail;
+                    while (self.size - obs) != index {
+                        pos = unsafe { (*pos).prev };
+                        obs += 1;
+                    }
+                } else {
+                    pos = self.head;
+                    while obs != index {
+                        pos = unsafe { (*pos).next };
+                        obs += 1;
+                    }
                 }
-            }else{
-                pos=unsafe{(*self.head).next};
-                while obs!=index{
-                    pos=unsafe{(*pos).next};
-                    obs+=1;
+                let next = unsafe { (*pos).next };
+                let prev = unsafe { (*pos).prev };
+                self.size -= 1;
+                unsafe {
+                    (*next).prev = prev;
+                    (*prev).next = next;
+                    let ele = (*pos).ele.take();
+                    Box::from_raw(pos);
+                    ele
                 }
             }
-            let mut node=Node::new(Some(ele)).to_raw();
-            let mut prev=unsafe{(*pos).prev};
-            unsafe{
-                (*node).prev=prev;
-                (*node).next=pos;
-                (*prev).next=node;
-                (*pos).prev=node;
-            }
-            self.size+=1;
         }
     }
-    pub fn drop_last(&mut self) {
-        self.remove(self.size);
+    pub fn insert(&mut self, index: u64, ele: T) {
+        assert!(index <= self.size + 1 && index > 0);
+        if index == 1 {
+            self.push_front(ele);
+        } else if index == self.size + 1 {
+            self.push_back(ele);
+        } else {
+            let mut obs = 0;
+            let mut pos;
+            if index > self.size / 2 {
+                pos = self.tail;
+                while (self.size - obs) != index {
+                    pos = unsafe { (*pos).prev };
+                    obs += 1;
+                }
+            } else {
+                pos = self.head;
+                while obs != index {
+                    pos = unsafe { (*pos).next };
+                    obs += 1;
+                }
+            }
+            let mut node = Node::new(Some(ele)).to_raw();
+            let mut prev = unsafe { (*pos).prev };
+            unsafe {
+                (*node).prev = prev;
+                (*node).next = pos;
+                (*prev).next = node;
+                (*pos).prev = node;
+            }
+            self.size += 1;
+        }
     }
-    pub fn drop_first(&mut self) {
-        self.remove(1);
+    pub fn drop_last(&mut self) -> Option<T> {
+        if self.size != 0 {
+            let tail = self.tail;
+            self.tail = unsafe { (*self.tail).prev };
+            self.size -= 1;
+            unsafe {
+                let ele = (*tail).ele.take();
+                Box::from_raw(tail);
+                ele
+            }
+        } else {
+            None
+        }
     }
-    pub fn size(&self)->u64{
+    pub fn drop_first(&mut self) -> Option<T> {
+        if self.size != 0 {
+            if self.size == 1 {
+                self.drop_last()
+            } else {
+                let first = unsafe { (*self.head).next };
+                let second = unsafe { (*first).next };
+                unsafe {
+                    (*self.head).next = second;
+                    (*second).prev = self.head;
+                }
+                self.size -= 1;
+                let ele = unsafe { (*first).ele.take() };
+                unsafe {
+                    Box::from_raw(first);
+                }
+                ele
+            }
+        } else {
+            None
+        }
+    }
+    pub fn size(&self) -> u64 {
         self.size
     }
 }
 
 impl<T> Drop for List<T> {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        let mut tmp = self.head;
+        loop {
+            tmp = unsafe {
+                Box::from_raw(tmp);
+                (*tmp).next
+            };
+            if tmp.is_null(){
+                break;
+            }
+        }
+    }
 }
 
 pub struct Queue<T> {
