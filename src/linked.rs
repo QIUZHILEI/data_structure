@@ -21,7 +21,7 @@ impl<T> Node<T> {
             },
         }
     }
-    fn to_raw(mut self) -> *mut Self {
+    fn to_raw(self) -> *mut Self {
         Box::into_raw(Box::new(self))
     }
 }
@@ -110,16 +110,51 @@ impl<T> List<T> {
         }
     }
     pub fn remove(&mut self, index: u64) {
-
-    }
-    pub fn insert(&mut self, index: u64) {}
-    pub fn drop_last(&mut self) {
-
-    }
-    pub fn drop_first(&mut self) {
+        assert!(index<=self.size&&index>0);
         
     }
-    pub fn size(&self) {}
+    pub fn insert(&mut self, index: u64,ele:T) {
+        assert!(index<=self.size+1&&index>0);
+        if index==1{
+            self.push_front(ele);
+        }else if index==self.size{
+            self.push_back(ele);
+        }else{
+            let mut obs=1;
+            let mut pos;
+            if index>self.size/2{
+                pos=self.tail;
+                while (self.size-obs)!=index {
+                    pos=unsafe{(*pos).prev};
+                    obs+=1;
+                }
+            }else{
+                pos=unsafe{(*self.head).next};
+                while obs!=index{
+                    pos=unsafe{(*pos).next};
+                    obs+=1;
+                }
+            }
+            let mut node=Node::new(Some(ele)).to_raw();
+            let mut prev=unsafe{(*pos).prev};
+            unsafe{
+                (*node).prev=prev;
+                (*node).next=pos;
+                (*prev).next=node;
+                (*pos).prev=node;
+            }
+            self.size+=1;
+        }
+    }
+    pub fn drop_last(&mut self) {
+        self.remove(self.size);
+    }
+    pub fn drop_first(&mut self) {
+        self.remove(1);
+    }
+    pub fn size(&self)->u64{
+        self.size
+    }
 }
 
 impl<T> Drop for List<T> {
