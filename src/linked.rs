@@ -1,4 +1,4 @@
-use std::{fmt::Display, marker::PhantomData, ptr::NonNull};
+use std::{fmt::Display, marker::PhantomData};
 
 struct Node<T> {
     next: *mut Node<T>,
@@ -7,22 +7,21 @@ struct Node<T> {
 }
 
 impl<T> Node<T> {
-    fn new(e: Option<T>) -> Self {
-        match e {
-            Some(_) => Self {
-                next: std::ptr::null_mut(),
-                prev: std::ptr::null_mut(),
-                ele: e,
-            },
-            None => Self {
-                next: std::ptr::null_mut(),
-                prev: std::ptr::null_mut(),
-                ele: None,
-            },
-        }
+    fn new_raw(e: T) -> *mut Self {
+        Box::into_raw(Box::new(Self {
+            next: std::ptr::null_mut(),
+            prev: std::ptr::null_mut(),
+            ele: Some(e),
+        }))
     }
-    fn to_raw(self) -> *mut Self {
-        Box::into_raw(Box::new(self))
+}
+impl<T> Default for Node<T> {
+    fn default() -> Self {
+        Self {
+            next: std::ptr::null_mut(),
+            prev: std::ptr::null_mut(),
+            ele: None,
+        }
     }
 }
 
@@ -36,7 +35,7 @@ pub struct List<T> {
 
 impl<T> List<T> {
     pub fn new() -> Self {
-        let node = Node::new(None).to_raw();
+        let node = Box::into_raw(Box::new(Node::default()));
         Self {
             head: node,
             tail: node,
@@ -45,7 +44,7 @@ impl<T> List<T> {
         }
     }
     pub fn push_back(&mut self, ele: T) {
-        let mut node = Node::new(Some(ele)).to_raw();
+        let mut node = Node::new_raw(ele);
         unsafe {
             (*node).prev = self.tail;
             (*self.tail).next = node;
@@ -57,7 +56,7 @@ impl<T> List<T> {
         if self.size == 0 {
             self.push_back(ele);
         } else {
-            let mut node = Node::new(None).to_raw();
+            let mut node = Box::into_raw(Box::new(Node::default()));
             unsafe {
                 (*self.head).ele = Some(ele);
                 (*node).next = self.head;
@@ -168,7 +167,7 @@ impl<T> List<T> {
                     obs += 1;
                 }
             }
-            let mut node = Node::new(Some(ele)).to_raw();
+            let mut node = Node::new_raw(ele);
             let mut prev = unsafe { (*pos).prev };
             unsafe {
                 (*node).prev = prev;
@@ -225,10 +224,11 @@ impl<T> Drop for List<T> {
         let mut tmp = self.head;
         loop {
             tmp = unsafe {
+                let next = (*tmp).next;
                 Box::from_raw(tmp);
-                (*tmp).next
+                next
             };
-            if tmp.is_null(){
+            if tmp.is_null() {
                 break;
             }
         }
@@ -242,15 +242,179 @@ pub struct Queue<T> {
     marker: PhantomData<Node<T>>,
 }
 
-pub struct Dequeue<T> {
-    head: *mut Node<T>,
-    tail: *mut Node<T>,
-    size: u64,
-    marker: PhantomData<Node<T>>,
+impl<T> Queue<T> {
+    pub fn new() -> Self {
+        let node = Box::into_raw(Box::new(Node::default()));
+        Self {
+            head: node,
+            tail: node,
+            size: 0,
+            marker: PhantomData::default(),
+        }
+    }
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+    pub fn enqueue(&mut self, e: T) {
+        let node = Node::new_raw(e);
+        unsafe {
+            (*node).prev = self.tail;
+            (*self.tail).next = node;
+        }
+        self.tail = node;
+        self.size += 1;
+    }
+    pub fn dequeue(&mut self) -> Option<T> {
+        if self.size == 0 {
+            return None;
+        }
+        let last = self.tail;
+        self.tail = unsafe { (*self.tail).prev };
+        let res = unsafe { (*last).ele.take() };
+        unsafe { Box::from_raw(last) };
+        self.size -= 1;
+        res
+    }
+    pub fn first(&self) -> Option<&T> {
+        if self.size == 0 {
+            None
+        } else {
+            let first = unsafe { (*self.head).next };
+            unsafe { (*first).ele.as_ref() }
+        }
+    }
+    pub fn last(&self) -> Option<&T> {
+        if self.size == 0 {
+            None
+        } else {
+            unsafe { (*self.tail).ele.as_ref() }
+        }
+    }
+    pub fn contains(&self, other: &T) -> bool
+    where
+        T: Eq,
+    {
+        let mut tmp = unsafe { (*self.head).next };
+        while !tmp.is_null() {
+            let self_ele = unsafe { (*tmp).ele.as_ref() }.unwrap();
+            if self_ele.eq(other) {
+                return true;
+            }
+            tmp = unsafe { (*tmp).next };
+        }
+        false
+    }
+    pub fn traverse(&self)
+    where
+        T: Display,
+    {
+        let mut tmp = unsafe { (*self.head).next };
+        while !tmp.is_null() {
+            let self_ele = unsafe { (*tmp).ele.as_ref() }.unwrap();
+            println!("{self_ele}");
+            tmp = unsafe { (*tmp).next };
+        }
+    }
+}
+
+impl<T> Drop for Queue<T> {
+    fn drop(&mut self) {
+        let mut tmp = self.head;
+        loop {
+            tmp = unsafe {
+                let next = (*tmp).next;
+                Box::from_raw(tmp);
+                next
+            };
+            if tmp.is_null() {
+                break;
+            }
+        }
+    }
 }
 
 pub struct Stack<T> {
     top: *mut Node<T>,
     size: u64,
     marker: PhantomData<Node<T>>,
+}
+
+impl<T> Stack<T> {
+    pub fn new() -> Self {
+        let node = Box::into_raw(Box::new(Node::default()));
+        Self {
+            top: node,
+            size: 0,
+            marker: PhantomData::default(),
+        }
+    }
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+    pub fn pop(&mut self) -> Option<T> {
+        if self.size == 0 {
+            return None;
+        }
+        let first = unsafe { (*self.top).next };
+        if self.size == 1 {
+            unsafe {
+                (*self.top).next = std::ptr::null_mut();
+            }
+        } else {
+            unsafe {
+                (*self.top).next = (*first).next;
+            }
+        }
+        let res = unsafe { (*first).ele.take() };
+        unsafe { Box::from_raw(first) };
+        res
+    }
+    pub fn push(&mut self) {}
+    pub fn top(&self) -> Option<&T> {
+        if self.size==0{
+            return None;
+        }
+        unsafe{(*(*self.top).next).ele.as_ref()}
+    }
+    pub fn contains(&self, other: &T) -> bool
+    where
+        T: Eq,
+    {
+        let mut tmp = unsafe { (*self.top).next };
+        while !tmp.is_null() {
+            let self_ele = unsafe { (*tmp).ele.as_ref() }.unwrap();
+            if self_ele.eq(other) {
+                return true;
+            }
+            tmp = unsafe { (*tmp).next };
+        }
+        false
+    }
+    pub fn traverse(&self)
+    where
+        T: Display,
+    {
+        let mut tmp = unsafe { (*self.top).next };
+        while !tmp.is_null() {
+            let self_ele = unsafe { (*tmp).ele.as_ref() }.unwrap();
+            println!("{self_ele}");
+            tmp = unsafe { (*tmp).next };
+        }
+    }
+}
+
+impl<T> Drop for Stack<T> {
+    fn drop(&mut self) {
+        let mut tmp = self.top;
+        loop {
+            tmp = unsafe {
+                let next = (*tmp).next;
+                Box::from_raw(tmp);
+                next
+            };
+            if tmp.is_null() {
+                break;
+            }
+        }
+    }
 }
