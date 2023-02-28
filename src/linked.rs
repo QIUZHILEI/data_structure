@@ -29,8 +29,8 @@ impl<T> Default for Node<T> {
 pub struct List<T> {
     head: *mut Node<T>,
     tail: *mut Node<T>,
-    size: u64,
-    marker: PhantomData<Node<T>>,
+    size: usize,
+    marker: PhantomData<Box<Node<T>>>,
 }
 
 impl<T> List<T> {
@@ -77,7 +77,7 @@ impl<T> List<T> {
             tmp = unsafe { (*tmp).next };
         }
     }
-    pub fn find(&self, other: &T) -> Option<u64>
+    pub fn find(&self, other: &T) -> Option<usize>
     where
         T: Eq,
     {
@@ -108,7 +108,7 @@ impl<T> List<T> {
             unsafe { (*self.tail).ele.as_ref() }
         }
     }
-    pub fn remove(&mut self, index: u64) -> Option<T> {
+    pub fn remove(&mut self, index: usize) -> Option<T> {
         if index > self.size || index == 0 {
             None
         } else {
@@ -145,7 +145,7 @@ impl<T> List<T> {
             }
         }
     }
-    pub fn insert(&mut self, index: u64, ele: T) {
+    pub fn insert(&mut self, index: usize, ele: T) {
         assert!(index <= self.size + 1 && index > 0);
         if index == 1 {
             self.push_front(ele);
@@ -214,7 +214,7 @@ impl<T> List<T> {
             None
         }
     }
-    pub fn size(&self) -> u64 {
+    pub fn size(&self) -> usize {
         self.size
     }
 }
@@ -238,8 +238,8 @@ impl<T> Drop for List<T> {
 pub struct Queue<T> {
     head: *mut Node<T>,
     tail: *mut Node<T>,
-    size: u64,
-    marker: PhantomData<Node<T>>,
+    size: usize,
+    marker: PhantomData<Box<Node<T>>>,
 }
 
 impl<T> Queue<T> {
@@ -252,7 +252,7 @@ impl<T> Queue<T> {
             marker: PhantomData::default(),
         }
     }
-    pub fn size(&self) -> u64 {
+    pub fn size(&self) -> usize {
         self.size
     }
     pub fn enqueue(&mut self, e: T) {
@@ -335,8 +335,8 @@ impl<T> Drop for Queue<T> {
 
 pub struct Stack<T> {
     top: *mut Node<T>,
-    size: u64,
-    marker: PhantomData<Node<T>>,
+    size: usize,
+    marker: PhantomData<Box<Node<T>>>,
 }
 
 impl<T> Stack<T> {
@@ -348,7 +348,7 @@ impl<T> Stack<T> {
             marker: PhantomData::default(),
         }
     }
-    pub fn size(&self) -> u64 {
+    pub fn size(&self) -> usize {
         self.size
     }
     pub fn pop(&mut self) -> Option<T> {
